@@ -33,13 +33,12 @@ mDisplayString	MACRO	someStringAddress
 	POP		EDX
 ENDM
 
-
-
 .data
 
 intro		BYTE	"PROJECT 6:	The sacred design of I/O procedures and low-level programming",9,9,"by Aimee Wirick",10,10,0
 directions	BYTE	"DIRECTIONS:",10,"Input 10 positive or negative integers that can fit in a 32 bit register.",10,"When you are done, the list of your numbers, their sum, and average will be displayed.",13,10,0
 numbrPrmpt	BYTE	"Enter your signed number here:", 0 ;prompt user to enter number
+errorPrmpt	BYTE	"ERROR:  You didn't enter a number, or your number was an incorrect format.",10,"Give it another try:", 0
 currPrmpt	DWORD	?
 maxLen		DWORD	12 ;maximum length of usrInput
 usrInput	SDWORD	? ; number from user
@@ -55,9 +54,10 @@ main PROC
 	CALL	CrLf
 	;start 10 count loop here
 	MOV		ECX, 0
-	MOV		ECX, 2					;THIS NEEDS TO CHANGE TO 10
+	MOV		ECX, 1					;THIS NEEDS TO CHANGE TO 10
 	MOV		EDI, OFFSET usrArray
 	_fillLoop:
+		PUSH	OFFSET	errorPrmpt	;4 bytes address
 		PUSH	OFFSET	numbrPrmpt	;4 bytes address
 		PUSH	maxLen				;4 bytes DWORD
 		PUSH	OFFSET  usrInput	;4 bytes address
@@ -73,34 +73,39 @@ main PROC
 	PUSH	correctNum			;4 bytes SDWORD
 	PUSH	byteCount			;4 bytes DWORD
 	CALL	WriteVal			;4 bytes return address
-	;mGetString	numbrPrmpt, stringLen, usrInput, byteCount ;GET RID OF THIS JUST TESTING HERE
-	;mDisplayString	usrInput ;	GET RID OF THIS JUST TESTING HERE
+
 	Invoke ExitProcess,0	; exit to operating system
 main ENDP
 
 ReadVal	PROC
-	PUSH	EBP					;build stack frame
-	MOV		EBP, ESP
+	;PUSH	EBP					;build stack frame
+	;MOV		EBP, ESP
+
+	;.data	;local variables to keep my head straight :)
+
+	LOCAL	prompt:DWORD	
+	LOCAL	errTryAgain:DWORD	
+	LOCAL	lengthMax:DWORD
+	LOCAL	inputNum:SDWORD	
+	LOCAL	byteNum:DWORD	
+	LOCAL	outNum:SDWORD
+	LOCAL	prevNum:SDWORD	
+	
+	LOCAL	sign:DWORD
+	
+
+	LOCAL	errorMes:DWORD
+	LOCAL	countNum:BYTE
+
+
+	
+	MOV		errorMes, 0
+	MOV		countNum, 0
+
 	PUSH	ECX
 	PUSH	EDI
 	PUSH	ESI
-	.data	;local variables to keep my head straight :)
-		MAX = +214748364 ;max signed value that can fit in a 32bit register 2147483647
-		MIN = -214748364 ;min signed value that can fit in a 32but register -2147483648
-		prompt		DWORD	?
-		errTryAgain	BYTE	"ERROR:  You didn't enter a number, or your number was an incorrect format.",10,"Give it another try:", 0
-		lengthMax	DWORD	?
-		inputNum	SDWORD	?
-		byteNum		DWORD	?
-		outNum		SDWORD	?
-		prevNum		SDWORD	?
-		subNum		SDWORD	?
-		sign		BYTE	?
-		tempNum		SDWORD	?
-		negSign		SDWORD  -1
-		errorMes	BYTE	0
-		countNum	BYTE	0
-	.code
+	;.code
 	MOV		EBX, 0
 	MOV		EBX, [EBP+8]	;find bytes
 	MOV		byteNum, EBX	;fill byte variable
@@ -110,12 +115,14 @@ ReadVal	PROC
 	MOV		lengthMax, EBX	;fill max length variable
 	MOV		EBX, [EBP+20]	;find prompt
 	MOV		prompt, EBX		;fill prompt variable
+	MOV		EBX, [EBP+24]	;find error message
+	MOV		errTryAgain, EBX;fill error message prompt
 	_start: 
 	;clear variables
 	MOV prevNum, 0
-	MOV subNum, 0
+	
 	MOV sign, 0
-	MOV tempNum, 0
+	
 	MOV errorMes, 0
 	MOV countNum, 0 
 	mGetString	prompt, lengthMax, inputNum, byteNum ;get string
@@ -152,13 +159,18 @@ ReadVal	PROC
 		    JMP		_errorMSG
 
 		_convert: ;had to make this because the loop was too big.  This uses local variables from ReadVal
+			MOV	EBX, sign
+			MOV EDX, prevNum
 			CALL	Convert
+			MOV	errorMes, EBX
+			MOV EBX, 0
+			MOV EDX, 0
 			JO	 _errorMSG
 			CMP		errorMes, 1
 			JE		_errorMSG
 			JMP  _store
 		_errorMSG:
-			MOV		EBX, OFFSET errTryAgain
+			MOV		EBX, errTryAgain
 			MOV		prompt, EBX ;sets error prompt
 			MOV		EBX, 0
 			JMP _start
@@ -169,24 +181,35 @@ ReadVal	PROC
 		_end:
 	LOOP _conversionLoop
 	MOV outNum, EAX ;moves the total into our outNum variable (do not erase)
-	MOV	EAX, outNum ;TAKE THIS OUT FOR WRITEINT ONLY
-	CALL WriteInt ;TAKE THIS OUT FOR CHECKING ONLY
+
 
 	MOV		EDX, outNum
 	MOV		EBX, byteNum
 	POP		ESI
 	POP		EDI
 	POP		ECX
-	POP		EBP
-	RET		16
+	;POP		EBP
+	RET		20
 ReadVal	ENDP
 
 Convert PROC ;subprocedure of ReadVal
-	PUSH	EBP					;build stack frame
-	MOV		EBP, ESP
+	LOCAL	MAX:SDWORD
+	LOCAL	MIN:SDWORD
+	LOCAL	negSign:SDWORD
+	LOCAL	tempNum:SDWORD
+	LOCAL	subNum:SDWORD
+	LOCAL	prevNum:SDWORD
+	LOCAL	errorMes:BYTE
+	
+	PUSH	EDX
+	MOV		prevNum, EDX
+	MOV		EDX, 0
+	MOV		negSign, -1
+	MOV		MIN, -214748364
+	MOV		MAX, +214748364
 	_convert:
 			SUB		EAX, 48
-			CMP		sign, 1
+			CMP		EBX, 1 ;EBX should have sign value
 			JE		_fixSign
 			JMP		_continue
 			_fixSign:
@@ -206,26 +229,28 @@ Convert PROC ;subprocedure of ReadVal
 			ADD		EAX, subNum
 			JMP		_end
 			_error:
-			MOV		errorMes, 1
+			MOV		EBX, 1
 			_end:
-	POP		EBP
+
+	POP		EDX
 	RET		
 Convert ENDP
 
-WriteVal	PROC
-	PUSH	EBP					;build stack frame
-	MOV		EBP, ESP
-	.data
-		numBytes		DWORD	?
-		number			SDWORD	?
-		copyNumber		SDWORD	?
-		arrayAddress	DWORD	? ;does this have to be an array set-up since it is just an address?
-		newString		DWORD	12 DUP(?)
-		newNum			DWORD	?
-		remainder		DWORD	?
-		quotient		DWORD	?
-		isNeg			BYTE	0
-	.code
+WriteVal	PROC ;this works
+
+		LOCAL	numBytes:DWORD	
+		LOCAL	number:SDWORD	
+		LOCAL	copyNumber:SDWORD
+		LOCAL	arrayAddress:DWORD	 ;does this have to be an array set-up since it is just an address?
+		LOCAL	revString[12]:BYTE	
+		LOCAL	newNum:DWORD	
+		LOCAL	remainder:DWORD
+		LOCAL	quotient:DWORD	
+		LOCAL	isNeg:BYTE
+		LOCAL	newString[12]:BYTE
+
+		PUSHAD
+
 		MOV		EBX,0
 		MOV		EBX, [EBP+8]	;find bytes
 		MOV		numBytes, EBX	;fill byte variable
@@ -235,7 +260,7 @@ WriteVal	PROC
 		MOV		arrayAddress, EBX
 		
 		;Set up the perameters for _writeLoop		
-		MOV	EDI, OFFSET newString
+		LEA	EDI, revString
 		CLD
 		MOV		ECX, 0
 		MOV		ECX, numBytes
@@ -280,7 +305,10 @@ WriteVal	PROC
 			MOV	isNeg, 0
 			_end:
 			;ADD ANOTHER WRITE USING STOSB AND REVERSING STRING TO CREATE FORWARDS STRING FOR WRITING?
-	POP		EBP
+	LEA	EAX, revString
+	mDisplayString	EAX
+	POPAD
+
 	RET		12
 WriteVal	ENDP
 END main
