@@ -64,22 +64,20 @@ main PROC
 		PUSH	OFFSET	byteCount	;4 bytes address
 		CALL	ReadVal				;4 bytes return address
 		MOV		byteCount, EBX
-		MOV		[EDI], EDX
+		MOV		[EDI], EDX;CHECK IF THIS IS ADDING THE CORRECT NUMBER IN THE ARRAY DO WE NEED TO CLEAR EDI IN SUB PROCEDURES?
 		ADD		EDI, 4
 		MOV		correctNum, EDX ;this should add to userArray in EDI
 		LOOP _fillLoop
 	;ADD A LOOP THAT LOADS EACH ELEMENT IN THE ARRAY AND PRINTS
 	PUSH	OFFSET  usrArray	;4 bytes address
-	PUSH	correctNum			;4 bytes SDWORD
-	PUSH	byteCount			;4 bytes DWORD
+	PUSH	correctNum			;4 bytes SDWORD  USE THE LOOP TO LOAD THIS ELEMENT INSTEAD
+	PUSH	byteCount			;4 bytes DWORD  USE Str_length TO GET THIS INSTEAD BECAUSE THIS WILL HAVE CHANGED
 	CALL	WriteVal			;4 bytes return address
 
 	Invoke ExitProcess,0	; exit to operating system
 main ENDP
 
 ReadVal	PROC
-	;PUSH	EBP					;build stack frame
-	;MOV		EBP, ESP
 
 	;.data	;local variables to keep my head straight :)
 
@@ -90,15 +88,10 @@ ReadVal	PROC
 	LOCAL	byteNum:DWORD	
 	LOCAL	outNum:SDWORD
 	LOCAL	prevNum:SDWORD	
-	
 	LOCAL	sign:DWORD
-	
-
 	LOCAL	errorMes:DWORD
 	LOCAL	countNum:BYTE
-
-
-	
+	;set up variable data
 	MOV		errorMes, 0
 	MOV		countNum, 0
 
@@ -188,7 +181,6 @@ ReadVal	PROC
 	POP		ESI
 	POP		EDI
 	POP		ECX
-	;POP		EBP
 	RET		20
 ReadVal	ENDP
 
@@ -238,7 +230,7 @@ Convert ENDP
 
 WriteVal	PROC ;this works
 
-		LOCAL	numBytes:DWORD	
+		LOCAL	numBytes:DWORD	;USE Str_length TO GET THIS INSTEAD BECAUSE THIS WILL HAVE CHANGED
 		LOCAL	number:SDWORD	
 		LOCAL	copyNumber:SDWORD
 		LOCAL	arrayAddress:DWORD	 ;does this have to be an array set-up since it is just an address?
@@ -305,7 +297,22 @@ WriteVal	PROC ;this works
 			MOV	isNeg, 0
 			_end:
 			;ADD ANOTHER WRITE USING STOSB AND REVERSING STRING TO CREATE FORWARDS STRING FOR WRITING?
-	LEA	EAX, revString
+		  ; Reverse the string
+	_loopReversal:
+	  MOV    ECX, numBytes
+	  LEA    ESI, revString 
+	  ADD    ESI, ECX
+	  DEC    ESI
+	  MOV    EDI, newString;SHOULD THIS BE STORED IN arrayAddress? MAYBE MAYBE NOT
+  
+	  ;   Reverse string
+	_revLoop:
+		STD
+		LODSB
+		CLD
+		STOSB
+	  LOOP   _revLoop
+	LEA	EAX, newString;SHOULD THIS BE STORED IN arrayAddress? MAYBE MAYBE NOT
 	mDisplayString	EAX
 	POPAD
 
