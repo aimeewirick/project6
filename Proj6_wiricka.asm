@@ -303,7 +303,7 @@ WriteVal	PROC ;this works
 	  LEA    ESI, revString 
 	  ADD    ESI, ECX
 	  DEC    ESI
-	  MOV    EDI, newString;SHOULD THIS BE STORED IN arrayAddress? MAYBE MAYBE NOT
+	  LEA    EDI, newString;SHOULD THIS BE STORED IN arrayAddress? MAYBE MAYBE NOT
   
 	  ;   Reverse string
 	_revLoop:
