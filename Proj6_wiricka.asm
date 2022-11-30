@@ -35,17 +35,21 @@ ENDM
 
 .data
 
-intro		BYTE	"PROJECT 6:	The sacred design of I/O procedures and low-level programming",9,9,"by Aimee Wirick",10,10,0
-directions	BYTE	"DIRECTIONS:",10,"Input 10 positive or negative integers that can fit in a 32 bit register.",10,"When you are done, the list of your numbers, their sum, and average will be displayed.",13,10,0
-numbrPrmpt	BYTE	"Enter your signed number here:", 0 ;prompt user to enter number
-errorPrmpt	BYTE	"ERROR:  You didn't enter a number, or your number was an incorrect format.",10,"Give it another try:", 0
-currPrmpt	DWORD	?
-maxLen		DWORD	12 ;maximum length of usrInput
-usrInput	SDWORD	? ; number from user
-correctNum	SDWORD	? ; checked  number value
-numCount	DWORD	? ;number of numbers from user
-byteCount	DWORD	? ;number of bytes in user input
-usrArray	SDWORD  10 DUP(?)
+intro			BYTE	"PROJECT 6:	The sacred design of I/O procedures and low-level programming",9,9,"by Aimee Wirick",10,10,0
+directions		BYTE	"DIRECTIONS:",10,"Input 10 positive or negative integers that can fit in a 32 bit register.",10,"When you are done, the list of your numbers, their sum, and average will be displayed.",13,10,0
+numbrPrmpt		BYTE	"Enter your signed number here:", 0 ;prompt user to enter number
+errorPrmpt		BYTE	"ERROR:  You didn't enter a number, or your number was an incorrect format.",10,"Give it another try:", 0
+currPrmpt		DWORD	?
+maxLen			DWORD	12 ;maximum length of usrInput
+usrInput		SDWORD	? ; number from user
+correctNum		SDWORD	? ; checked  number value
+numCount		DWORD	? ;number of numbers from user
+byteCount		DWORD	? ;number of bytes in user input
+byteCountArray	DWORD	10 DUP(?)
+revByteArray	DWORD	10 DUP(?) ;tracks each number's origianl length
+usrArray		SDWORD  10 DUP(?)
+localNum		SDWORD  ?
+arrayLen		BYTE	3 ;CHANGE TO 10
 
 .code
 main PROC
@@ -54,8 +58,9 @@ main PROC
 	CALL	CrLf
 	;start 10 count loop here
 	MOV		ECX, 0
-	MOV		ECX, 1					;THIS NEEDS TO CHANGE TO 10
+	MOV		CL, arrayLen				;THIS NEEDS TO CHANGE TO 10
 	MOV		EDI, OFFSET usrArray
+	MOV		ESI, OFFSET byteCountArray
 	_fillLoop:
 		PUSH	OFFSET	errorPrmpt	;4 bytes address
 		PUSH	OFFSET	numbrPrmpt	;4 bytes address
@@ -64,15 +69,34 @@ main PROC
 		PUSH	OFFSET	byteCount	;4 bytes address
 		CALL	ReadVal				;4 bytes return address
 		MOV		byteCount, EBX
-		MOV		[EDI], EDX;CHECK IF THIS IS ADDING THE CORRECT NUMBER IN THE ARRAY DO WE NEED TO CLEAR EDI IN SUB PROCEDURES?
+		MOV		[ESI], EBX ;store information on how dang long the numbers
+		ADD		ESI, 4
+		MOV		[EDI], EDX;store number in array
 		ADD		EDI, 4
 		MOV		correctNum, EDX ;this should add to userArray in EDI
 		LOOP _fillLoop
 	;ADD A LOOP THAT LOADS EACH ELEMENT IN THE ARRAY AND PRINTS
-	PUSH	OFFSET  usrArray	;4 bytes address
-	PUSH	correctNum			;4 bytes SDWORD  USE THE LOOP TO LOAD THIS ELEMENT INSTEAD
-	PUSH	byteCount			;4 bytes DWORD  USE Str_length TO GET THIS INSTEAD BECAUSE THIS WILL HAVE CHANGED
-	CALL	WriteVal			;4 bytes return address
+	_returnLoop:
+
+		_setNumberLoop:
+			;set up loop backwards
+			MOV    CL, arrayLen
+			MOV    ESI, OFFSET usrArray
+			;MOV	   EAX, ECX
+			;IMUL   EAX, 4
+			;ADD    ESI, EAX ;sets us at the end of the array
+			;SUB	   ESI, 4
+			MOV	   EAX, 0
+		_revArray:
+			CLD
+			STD
+			LODSD
+			MOV		localNum, EAX
+			CLD
+			PUSH	localNum	;4 bytes SDWORD
+			CALL	WriteVal	;4 bytes return address
+		  LOOP   _revArray
+
 
 	Invoke ExitProcess,0	; exit to operating system
 main ENDP
@@ -230,7 +254,7 @@ Convert ENDP
 
 WriteVal	PROC ;this works
 
-		LOCAL	numBytes:DWORD	;USE Str_length TO GET THIS INSTEAD BECAUSE THIS WILL HAVE CHANGED
+		LOCAL	numDigits:DWORD	;USE Str_length TO GET THIS INSTEAD BECAUSE THIS WILL HAVE CHANGED
 		LOCAL	number:SDWORD	
 		LOCAL	copyNumber:SDWORD
 		LOCAL	arrayAddress:DWORD	 ;does this have to be an array set-up since it is just an address?
@@ -240,22 +264,30 @@ WriteVal	PROC ;this works
 		LOCAL	quotient:DWORD	
 		LOCAL	isNeg:BYTE
 		LOCAL	newString[12]:BYTE
+		LOCAL	byteQuotient:DWORD
 
+		MOV		numDigits, 0
+		MOV		number, 0
+		MOV		copyNumber, 0
+		MOV		arrayAddress, 0
+		MOV		revString, 0
+		MOV		newNum, 0
+		MOV		remainder, 0
+		MOV		quotient, 0
+		MOV		isNeg, 0
+		MOV		newString, 0
+		MOV		byteQuotient, 0
 		PUSHAD
 
 		MOV		EBX,0
-		MOV		EBX, [EBP+8]	;find bytes
-		MOV		numBytes, EBX	;fill byte variable
-		MOV		EBX,[EBP+12]	;find user input number
+		MOV		EBX,[EBP+8]	;find user input number
 		MOV		number, EBX		;fill user input variable
-		MOV		EBX,[EBP+16]	;find array address
-		MOV		arrayAddress, EBX
-		
+
+
+
+		MOV		revString, 0
 		;Set up the perameters for _writeLoop		
-		LEA	EDI, revString
-		CLD
-		MOV		ECX, 0
-		MOV		ECX, numBytes
+		_checkSign:
 		MOV	EAX, 0 ;clear eax for new byte
 		MOV	EAX, number
 		SUB	EAX, 0
@@ -265,14 +297,28 @@ WriteVal	PROC ;this works
 		MOV		isNeg, 1
 		IMUL	EAX, -1
 		MOV		number, EAX	
-		DEC		ECX
 		_next:
 		MOV		newNum, EAX
-
+		MOV		byteQuotient, EAX
+		_findNumberOfDigits:
+			MOV	EAX, byteQuotient
+			MOV	EDX, 0
+			MOV	EBX, 10
+			DIV EBX
+			MOV EBX, 0
+			MOV	EBX, 1
+			ADD	numDigits, EBX
+			CMP EAX, 0
+			JE	_stringConvert
+			MOV byteQuotient, EAX
+			JMP _findNumberOfDigits
+		_stringConvert:
+		LEA	EDI, revString
+		CLD
+		MOV		ECX, 0
+		MOV		ECX, numDigits
 
 		_writeLoop:
-
-			_continue:
 			MOV EAX, newNum
 			MOV EDX, 0
 			MOV EBX, 10
@@ -295,11 +341,12 @@ WriteVal	PROC ;this works
 			MOV	[EDI], EBX
 			ADD	EDI,1
 			MOV	isNeg, 0
+			INC	numDigits
 			_end:
 			;ADD ANOTHER WRITE USING STOSB AND REVERSING STRING TO CREATE FORWARDS STRING FOR WRITING?
 		  ; Reverse the string
 	_loopReversal:
-	  MOV    ECX, numBytes
+	  MOV    ECX, numDigits
 	  LEA    ESI, revString 
 	  ADD    ESI, ECX
 	  DEC    ESI
@@ -316,6 +363,6 @@ WriteVal	PROC ;this works
 	mDisplayString	EAX
 	POPAD
 
-	RET		12
+	RET		4
 WriteVal	ENDP
 END main
