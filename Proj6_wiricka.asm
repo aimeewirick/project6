@@ -39,90 +39,106 @@ intro			BYTE	"PROJECT 6:	The sacred design of I/O procedures and low-level progr
 directions		BYTE	"DIRECTIONS:",10,"Input 10 positive or negative integers that can fit in a 32 bit register.",10,"When you are done, the list of your numbers, their sum, and average will be displayed.",13,10,0
 numbrPrmpt		BYTE	"Enter your signed number here:", 0 ;prompt user to enter number
 errorPrmpt		BYTE	"ERROR:  You didn't enter a number, or your number was an incorrect format.",10,"Give it another try:", 0
-currPrmpt		DWORD	?
+yourNumbers		BYTE	"The numbers you entered are: ", 13,10,0
+yourAverage		BYTE	"The average of your numbers is: ",13,10,0
+yourSum			BYTE	"The Sum of your numbers is: ", 13,10,0
 maxLen			DWORD	12 ;maximum length of usrInput
 usrInput		SDWORD	? ; number from user
-correctNum		SDWORD	? ; checked  number value
-numCount		DWORD	? ;number of numbers from user
 byteCount		DWORD	? ;number of bytes in user input
-byteCountArray	DWORD	10 DUP(?)
-revByteArray	DWORD	10 DUP(?) ;tracks each number's origianl length
 usrArray		SDWORD  10 DUP(?)
 localNum		SDWORD  ?
-arrayLen		BYTE	3 ;CHANGE TO 10
+arrayLen		DWORD	10 ;CHANGE TO 10
+counter			SDWORD	?
+numberSum		SDWORD  ?
+avrgNum			SDWORD	?
+corrNum			SDWORD	?
 
 .code
 main PROC
+	_intro:
 	mDisplayString	OFFSET intro		;print intro
 	mDisplayString	OFFSET directions	;print directions
 	CALL	CrLf
-	;start 10 count loop here
+
+	_setupArray:
 	MOV		ECX, 0
-	MOV		CL, arrayLen				;THIS NEEDS TO CHANGE TO 10
+	MOV		ECX, arrayLen				;THIS NEEDS TO CHANGE TO 10
 	MOV		EDI, OFFSET usrArray
-	MOV		ESI, OFFSET byteCountArray
-	_fillLoop:
+	_fillArray:
+		PUSH	OFFSET	corrNum		;4 bytes address
 		PUSH	OFFSET	errorPrmpt	;4 bytes address
 		PUSH	OFFSET	numbrPrmpt	;4 bytes address
 		PUSH	maxLen				;4 bytes DWORD
 		PUSH	OFFSET  usrInput	;4 bytes address
 		PUSH	OFFSET	byteCount	;4 bytes address
 		CALL	ReadVal				;4 bytes return address
-		MOV		byteCount, EBX
-		MOV		[ESI], EBX ;store information on how dang long the numbers
-		ADD		ESI, 4
-		MOV		[EDI], EDX;store number in array
+		MOV		EBX, corrNum
+		MOV		[EDI], EBX			;store number in array
 		ADD		EDI, 4
-		MOV		correctNum, EDX ;this should add to userArray in EDI
-		LOOP _fillLoop
-	;ADD A LOOP THAT LOADS EACH ELEMENT IN THE ARRAY AND PRINTS
-	_returnLoop:
+		LOOP _fillArray
 
+	_returnResults:
+		_dialogue1: 
+		mDisplayString	OFFSET yourNumbers ;dialogue to display numbers
 		_setNumberLoop:
-			;set up loop backwards
-			MOV    CL, arrayLen
-			MOV    ESI, OFFSET usrArray
-			;MOV	   EAX, ECX
-			;IMUL   EAX, 4
-			;ADD    ESI, EAX ;sets us at the end of the array
-			;SUB	   ESI, 4
-			MOV	   EAX, 0
-		_revArray:
+		MOV    ECX, arrayLen
+		MOV    ESI, OFFSET usrArray
+		MOV	   EAX, 0
+		_revArray: ;displays numbers in usrArray
 			CLD
-			STD
 			LODSD
 			MOV		localNum, EAX
 			CLD
 			PUSH	localNum	;4 bytes SDWORD
-			CALL	WriteVal	;4 bytes return address
-		  LOOP   _revArray
-
+			ADD		numberSum, EAX ;adds the number to the numberSum to track total
+			MOV		counter, ECX
+			CALL	WriteVal	;4 bytes return address .... writes the numbers individually
+			MOV		ECX, counter
+			LOOP   _revArray
+		_dialogue2: ;dialogue to display sum of array numbers
+		mDisplayString	OFFSET yourSum
+		PUSH	numberSum ;4 bytes SDWORD
+		CALL	WriteVal ;4 bytes return address .... writes the sum
+		_findAverage: ;calculates the average of the array numbers
+		MOV	EAX, numberSum
+		MOV EBX, arrayLen
+		CDQ
+		IDIV EBX
+		MOV avrgNum, EAX
+		XOR EAX,EAX
+		XOR EBX,EBX
+		_dialogue3: ;dialogue to display average of array numbers
+		mDisplayString	OFFSET yourAverage
+		PUSH	avrgNum ;4 bytes SDWORD
+		CALL	WriteVal ;4 bytes return address .... writes the average
 
 	Invoke ExitProcess,0	; exit to operating system
 main ENDP
 
 ReadVal	PROC
 
-	;.data	;local variables to keep my head straight :)
-
+;local variables to keep my head straight :)
+	LOCAL	origPrompt:DWORD
 	LOCAL	prompt:DWORD	
 	LOCAL	errTryAgain:DWORD	
 	LOCAL	lengthMax:DWORD
 	LOCAL	inputNum:SDWORD	
 	LOCAL	byteNum:DWORD	
-	LOCAL	outNum:SDWORD
 	LOCAL	prevNum:SDWORD	
 	LOCAL	sign:DWORD
 	LOCAL	errorMes:DWORD
-	LOCAL	countNum:BYTE
-	;set up variable data
+	LOCAL	countNum:DWORD
+	LOCAL   currNum:SDWORD
+	LOCAL	correctNum:SDWORD
+	LOCAL   tempPrev:SDWORD
+	PUSHAD ;push all directories 32 bytes
+	
+	;clear variables
 	MOV		errorMes, 0
 	MOV		countNum, 0
-
-	PUSH	ECX
-	PUSH	EDI
-	PUSH	ESI
-	;.code
+	MOV		prevNum, 0
+	MOV		sign, 0
+	;set up variable data
 	MOV		EBX, 0
 	MOV		EBX, [EBP+8]	;find bytes
 	MOV		byteNum, EBX	;fill byte variable
@@ -131,26 +147,26 @@ ReadVal	PROC
 	MOV		EBX, [EBP+16]	;find max length
 	MOV		lengthMax, EBX	;fill max length variable
 	MOV		EBX, [EBP+20]	;find prompt
-	MOV		prompt, EBX		;fill prompt variable
+	MOV		origPrompt, EBX		;fill prompt variable
 	MOV		EBX, [EBP+24]	;find error message
 	MOV		errTryAgain, EBX;fill error message prompt
-	_start: 
-	;clear variables
-	MOV prevNum, 0
-	
-	MOV sign, 0
-	
-	MOV errorMes, 0
-	MOV countNum, 0 
+	MOV		EBX, [EBP+28]	;find corrNum address
+	MOV		correctNum, EBX
+
+	MOV		EBX, origPrompt
+	MOV		prompt, EBX
+	_start:
 	mGetString	prompt, lengthMax, inputNum, byteNum ;get string
 	CLD
+	MOV EBX, origPrompt
+	MOV prompt, EBX
 	MOV	ECX, byteNum ;start counter for gathering each byte
 	MOV	ESI, inputNum ;start pointers for gathering each byte
-
+	CMP byteNum, 0
+	JE	_errorMSG
 	_conversionLoop:
-	 CMP  countNum, 10 ;keeps track if our number is over 10 bytes long (disregards + -)
-	 JE	  _errorMSG
-	 MOV  EAX, 0 ;clears EAX register for introducing our first byte
+
+	 XOR	EAX,EAX;clears EAX register for introducing our first byte
 	 LODSB  ;puts byte in AL
 		CMP		AL, 43 ; +
 		JE		_setSignPositive
@@ -176,12 +192,15 @@ ReadVal	PROC
 		    JMP		_errorMSG
 
 		_convert: ;had to make this because the loop was too big.  This uses local variables from ReadVal
-			MOV	EBX, sign
-			MOV EDX, prevNum
+			MOV		currNum, EAX	
+			PUSH	prevNum			;4 byte SDWORD
+			PUSH	currNum			;4 byte SDWORD
+			PUSH	sign			;4 byte DWORD
+			LEA		EBX, tempPrev   ;MAKE THIS A LOCAL VARIABLE IN Convert? Take it out here
+			PUSH	EBX				;4 byte register
+			LEA     EBX, errorMes
+			PUSH	EBX				;4 byte register
 			CALL	Convert
-			MOV	errorMes, EBX
-			MOV EBX, 0
-			MOV EDX, 0
 			JO	 _errorMSG
 			CMP		errorMes, 1
 			JE		_errorMSG
@@ -189,23 +208,25 @@ ReadVal	PROC
 		_errorMSG:
 			MOV		EBX, errTryAgain
 			MOV		prompt, EBX ;sets error prompt
-			MOV		EBX, 0
+			XOR     EBX,EBX
+			MOV     errorMes, EBX
+			MOV		countNum, EBX
+			MOV     prevNum, EBX
+			MOV		tempPrev, EBX
 			JMP _start
 
 		_store:
+			MOV		EAX, tempPrev
 			MOV		prevNum, EAX ;stores the number as prevNum so we can progress
 			INC		countNum
 		_end:
 	LOOP _conversionLoop
-	MOV outNum, EAX ;moves the total into our outNum variable (do not erase)
 
+	MOV  EDI, correctNum ;address for corrNum
+	MOV	 [EDI], EAX ;moves the corrected number in to address for the variable corrNum in main
 
-	MOV		EDX, outNum
-	MOV		EBX, byteNum
-	POP		ESI
-	POP		EDI
-	POP		ECX
-	RET		20
+	POPAD ;pop all directoreis
+	RET		24
 ReadVal	ENDP
 
 Convert PROC ;subprocedure of ReadVal
@@ -214,17 +235,37 @@ Convert PROC ;subprocedure of ReadVal
 	LOCAL	negSign:SDWORD
 	LOCAL	tempNum:SDWORD
 	LOCAL	subNum:SDWORD
-	LOCAL	prevNum:SDWORD
-	LOCAL	errorMes:BYTE
+	LOCAL	previousNum:SDWORD ;actual number from parent procedure
+	LOCAL	errorMes:DWORD ;address for error message in parent procedure
+	LOCAL	sign2:DWORD    ;actual number 1 or 0 indicating sign
+	LOCAL   current:SDWORD ;address for current number from EAX in parent procedure
+	LOCAL   outNumAddr:DWORD
 	
-	PUSH	EDX
-	MOV		prevNum, EDX
-	MOV		EDX, 0
+	PUSHAD	
+	MOV		EBX, 0
+	MOV		EBX, [EBP+8]	
+	MOV		errorMes, EBX	;error message address
+	MOV		EBX,[EBP+12]	;find out number address
+	MOV		outNumAddr, EBX ;address of what we send to parent procedures
+	MOV		EBX, [EBP+16]
+	MOV		sign2, EBX		;1 or 0 indicating sign
+	MOV		EBX, [EBP+20]   ;current number in parent procedure under EAX
+	MOV		current, EBX
+	MOV		EBX, [EBP+24]   ;previous number in parent procedure
+	MOV		previousNum, EBX
+
 	MOV		negSign, -1
 	MOV		MIN, -214748364
 	MOV		MAX, +214748364
+	MOV		EDI, errorMes
+	MOV		EBX,0
+	MOV		[EDI],EBX
+	XOR		EAX,EAX
+	MOV		tempNum, 0
 	_convert:
+			MOV		EAX, current
 			SUB		EAX, 48
+			MOV		EBX, sign2
 			CMP		EBX, 1 ;EBX should have sign value
 			JE		_fixSign
 			JMP		_continue
@@ -235,7 +276,7 @@ Convert PROC ;subprocedure of ReadVal
 			_continue:
 			MOV		subNum, EAX
 			MOV		EAX, 0
-			MOV		EAX, prevNum
+			MOV		EAX, previousNum
 			CMP		EAX, MIN
 			JL		_error
 			CMP		EAX, MAX
@@ -243,13 +284,20 @@ Convert PROC ;subprocedure of ReadVal
 			MOV		EBX, 10
 			IMUL	EBX
 			ADD		EAX, subNum
-			JMP		_end
+			JMP		_store
 			_error:
-			MOV		EBX, 1
-			_end:
+			MOV	EDI, errorMes
+			MOV EBX, 1
+			MOV [EDI], EBX
+			XOR EBX,EBX
 
-	POP		EDX
-	RET		
+			JMP _end
+			_store:
+			MOV EDI, outNumAddr
+			MOV [EDI], EAX
+			_end:
+	POPAD
+	RET 20
 Convert ENDP
 
 WriteVal	PROC ;this works
@@ -275,7 +323,12 @@ WriteVal	PROC ;this works
 		MOV		remainder, 0
 		MOV		quotient, 0
 		MOV		isNeg, 0
-		MOV		newString, 0
+		XOR		EAX,EAX
+		MOV		ECX, 12
+		LEA		EBX, newString
+		MOV		EDI, EBX
+		CLD
+		REP     STOSB
 		MOV		byteQuotient, 0
 		PUSHAD
 
@@ -317,8 +370,9 @@ WriteVal	PROC ;this works
 		CLD
 		MOV		ECX, 0
 		MOV		ECX, numDigits
-
-		_writeLoop:
+		CMP		ECX, 1
+		JE		_writeSingleLoop
+		_writeMultipleLoop:
 			MOV EAX, newNum
 			MOV EDX, 0
 			MOV EBX, 10
@@ -330,8 +384,15 @@ WriteVal	PROC ;this works
 			MOV	[EDI], EDX
 			ADD	EDI, 1 ;may need to change back to 4?
 			MOV newNum, EAX
-			LOOP _writeLoop
-						
+			LOOP _writeMultipleLoop
+			JMP _postLoop
+		_writeSingleLoop:
+			MOV EAX, newNum
+			ADD EAX, 48
+			MOV [EDI], EAX
+			ADD EDI, 1
+			MOV EAX, 0
+		_postLoop:			
 			MOV	AL, isNeg ;adds negative at end of string so that when we reverse it it will be read at beginning
 			CMP	AL, 1
 			JE	_addNeg
@@ -339,21 +400,22 @@ WriteVal	PROC ;this works
 			_addNeg:
 			MOV EBX, 45
 			MOV	[EDI], EBX
-			ADD	EDI,1
 			MOV	isNeg, 0
 			INC	numDigits
 			_end:
 			;ADD ANOTHER WRITE USING STOSB AND REVERSING STRING TO CREATE FORWARDS STRING FOR WRITING?
 		  ; Reverse the string
 	_loopReversal:
+	  MOV	 ECX, 0
 	  MOV    ECX, numDigits
 	  LEA    ESI, revString 
 	  ADD    ESI, ECX
 	  DEC    ESI
 	  LEA    EDI, newString;SHOULD THIS BE STORED IN arrayAddress? MAYBE MAYBE NOT
-  
+	  MOV	EAX, 0	
+	  MOV newString, 0
 	  ;   Reverse string
-	_revLoop:
+	_revLoop: ;this isn't working
 		STD
 		LODSB
 		CLD
@@ -361,6 +423,7 @@ WriteVal	PROC ;this works
 	  LOOP   _revLoop
 	LEA	EAX, newString;SHOULD THIS BE STORED IN arrayAddress? MAYBE MAYBE NOT
 	mDisplayString	EAX
+	CALL CrLf
 	POPAD
 
 	RET		4
