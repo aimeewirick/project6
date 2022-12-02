@@ -9,28 +9,28 @@ TITLE Project6    (Proj6_wiricka.asm)
 			;and calling low-level I/O procedures and implements and uses macros
 			;goal is to get 10 valid number inputs from a user, store them in an array,
 			;display the integers, their sum, and their truncated average.
+			;Procedure Local variable and push/pop directory format is per ED Discussions "LOCAL variables (optional)#437" -by TA Megan Steele (thank you!)
 
 INCLUDE Irvine32.inc
 
 ; Macros
 mGetString	MACRO	prompt, availLength, someInput, bytes
-	PUSH	EDX ;sets up stack
-	PUSH	ECX
+	PUSHAD
 	MOV		EDX, prompt ;prompt user to enter a number
 	CALL	WriteString
 	MOV		EDX, someInput ;moves address for someInput; placholder for variable to EDX which will then have user number in it CHANGE OFFSET?
 	MOV		ECX, availLength ;sets the length of user input this is necessary for ReadString to work
 	CALL	ReadString 
 	MOV		bytes, EAX ;moves EAX value of bytes in user string to byteCount placeholder variable
-	POP		ECX  ;resets stack
-	POP		EDX
+	POPAD
 ENDM  
 
 mDisplayString	MACRO	someStringAddress
-	PUSH	EDX
+	PUSHAD
 	MOV     EDX, someStringAddress
 	CALL	WriteString
-	POP		EDX
+
+	POPAD
 ENDM
 
 .data
@@ -43,11 +43,11 @@ yourNumbers		BYTE	"The numbers you entered are: ", 13,10,0
 yourAverage		BYTE	"The average of your numbers is: ",13,10,0
 yourSum			BYTE	"The Sum of your numbers is: ", 13,10,0
 maxLen			DWORD	12 ;maximum length of usrInput
-usrInput		SDWORD	? ; number from user
+usrInput		SDWORD	11 DUP(?) ; number from user
 byteCount		DWORD	? ;number of bytes in user input
-usrArray		SDWORD  10 DUP(?)
+usrArray		SDWORD  11 DUP(?)
 localNum		SDWORD  ?
-arrayLen		DWORD	10 ;CHANGE TO 10
+arrayLen		DWORD	3 ;ten numbers long
 counter			SDWORD	?
 numberSum		SDWORD  ?
 avrgNum			SDWORD	?
@@ -62,7 +62,7 @@ main PROC
 
 	_setupArray:
 	MOV		ECX, 0
-	MOV		ECX, arrayLen				;THIS NEEDS TO CHANGE TO 10
+	MOV		ECX, arrayLen				
 	MOV		EDI, OFFSET usrArray
 	_fillArray:
 		PUSH	OFFSET	corrNum		;4 bytes address
@@ -76,14 +76,16 @@ main PROC
 		MOV		[EDI], EBX			;store number in array
 		ADD		EDI, 4
 		LOOP _fillArray
-
+	
 	_returnResults:
-		_dialogue1: 
+		_dialogue1:
+		CALL	CrLF
+		CALL	CrLf
 		mDisplayString	OFFSET yourNumbers ;dialogue to display numbers
 		_setNumberLoop:
 		MOV    ECX, arrayLen
 		MOV    ESI, OFFSET usrArray
-		MOV	   EAX, 0
+		XOR	   EAX,EAX
 		_revArray: ;displays numbers in usrArray
 			CLD
 			LODSD
@@ -93,12 +95,23 @@ main PROC
 			ADD		numberSum, EAX ;adds the number to the numberSum to track total
 			MOV		counter, ECX
 			CALL	WriteVal	;4 bytes return address .... writes the numbers individually
+			CMP		ECX, 1
+			JE		_finish
+			MOV		AL, 44
+			CALL	WriteChar
+			MOV		AL, 32
+			CALL	WriteChar
+			_finish:
 			MOV		ECX, counter
 			LOOP   _revArray
+		CALL CrLf
+		CALL CrLf
 		_dialogue2: ;dialogue to display sum of array numbers
 		mDisplayString	OFFSET yourSum
 		PUSH	numberSum ;4 bytes SDWORD
 		CALL	WriteVal ;4 bytes return address .... writes the sum
+		CALL	CrLf
+		CALL	CrLf
 		_findAverage: ;calculates the average of the array numbers
 		MOV	EAX, numberSum
 		MOV EBX, arrayLen
@@ -111,7 +124,8 @@ main PROC
 		mDisplayString	OFFSET yourAverage
 		PUSH	avrgNum ;4 bytes SDWORD
 		CALL	WriteVal ;4 bytes return address .... writes the average
-
+		CALL	CrLf
+		CALL	CrLf
 	Invoke ExitProcess,0	; exit to operating system
 main ENDP
 
@@ -122,7 +136,7 @@ ReadVal	PROC
 	LOCAL	prompt:DWORD	
 	LOCAL	errTryAgain:DWORD	
 	LOCAL	lengthMax:DWORD
-	LOCAL	inputNum:SDWORD	
+	LOCAL	inputNum[11]:SDWORD	
 	LOCAL	byteNum:DWORD	
 	LOCAL	prevNum:SDWORD	
 	LOCAL	sign:DWORD
@@ -138,6 +152,7 @@ ReadVal	PROC
 	MOV		countNum, 0
 	MOV		prevNum, 0
 	MOV		sign, 0
+	MOV		correctNum, 0
 	;set up variable data
 	MOV		EBX, 0
 	MOV		EBX, [EBP+8]	;find bytes
@@ -158,6 +173,7 @@ ReadVal	PROC
 	_start:
 	mGetString	prompt, lengthMax, inputNum, byteNum ;get string
 	CLD
+	MOV sign,0
 	MOV EBX, origPrompt
 	MOV prompt, EBX
 	MOV	ECX, byteNum ;start counter for gathering each byte
@@ -174,6 +190,7 @@ ReadVal	PROC
 		JE		_setSignNegative
 		CMP		AL, 48 ;checks for numerical value against the lowest ascii numerical representation
 		JGE     _checkHi
+		JMP		_errorMSG
 		_setSignPositive: ;sets a local variable so we can track if the number is positive
 			MOV		sign, 0
 			MOV		EBX, byteNum
@@ -181,10 +198,10 @@ ReadVal	PROC
 			JE		_errorMSG
 			JMP		_end
 		_setSignNegative: ;sets a local variable so we can track if number is negative
-			MOV		sign, 1
 			MOV		EBX, byteNum
 			CMP		EBX, 1
 			JE		_errorMSG
+			MOV		sign, 1
 			JMP		_end
 		_checkHi: ;checks against the highest ascii numerical representation 57
 			CMP		AL, 57
@@ -239,7 +256,7 @@ Convert PROC ;subprocedure of ReadVal
 	LOCAL	errorMes:DWORD ;address for error message in parent procedure
 	LOCAL	sign2:DWORD    ;actual number 1 or 0 indicating sign
 	LOCAL   current:SDWORD ;address for current number from EAX in parent procedure
-	LOCAL   outNumAddr:DWORD
+	LOCAL   outNumAddr:SDWORD
 	
 	PUSHAD	
 	MOV		EBX, 0
@@ -314,6 +331,8 @@ WriteVal	PROC ;this works
 		LOCAL	newString[12]:BYTE
 		LOCAL	byteQuotient:DWORD
 
+		PUSHAD
+
 		MOV		numDigits, 0
 		MOV		number, 0
 		MOV		copyNumber, 0
@@ -330,7 +349,7 @@ WriteVal	PROC ;this works
 		CLD
 		REP     STOSB
 		MOV		byteQuotient, 0
-		PUSHAD
+	
 
 		MOV		EBX,0
 		MOV		EBX,[EBP+8]	;find user input number
@@ -423,7 +442,7 @@ WriteVal	PROC ;this works
 	  LOOP   _revLoop
 	LEA	EAX, newString;SHOULD THIS BE STORED IN arrayAddress? MAYBE MAYBE NOT
 	mDisplayString	EAX
-	CALL CrLf
+
 	POPAD
 
 	RET		4
