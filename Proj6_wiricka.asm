@@ -9,11 +9,18 @@ TITLE Project6    (Proj6_wiricka.asm)
 			;and calling low-level I/O procedures and implements and uses macros
 			;goal is to get 10 valid number inputs from a user, store them in an array,
 			;display the integers, their sum, and their truncated average.
-			;Procedure Local variable and push/pop directory format is per ED Discussions "LOCAL variables (optional)#437" -by TA Megan Steele (thank you!)
+			;displays error message If the user enters non-digits other than something which will indicate sign (e.g. ‘+’ or ‘-‘), or the number is too large for 32-bit registers
+			;displays error message if user enters nothing
+			;parameters are passed on the stack, registers are saved and restored
+			;Procedure LOCAL variable and push/pop directory format is per ED Discussions "LOCAL variables (optional)#437" -by TA Megan Steele & Kevin Kuei (thank you!)
 
 INCLUDE Irvine32.inc
 
-; Macros
+; description: Displays a prompt and get's user's keyboard input in to a memory location
+; preconditions: variables set up in Main and pushed to ReadString 
+; postconditions: Variables someInput and bytes have been filled with current information
+; receives: input parameters : prompt(by reference), availLength
+; returns: the user's input(by reference), number of byes
 mGetString	MACRO	prompt, availLength, someInput, bytes
 	PUSHAD
 	MOV		EDX, prompt ;prompt user to enter a number
@@ -25,6 +32,11 @@ mGetString	MACRO	prompt, availLength, someInput, bytes
 	POPAD
 ENDM  
 
+; description: Prints the string that has been given to it by address
+; preconditions: variable someStringAddress has been filled with an address
+; postconditions: Prints string
+; receives: someStringAddress by reference 
+; returns: Prints string
 mDisplayString	MACRO	someStringAddress
 	PUSHAD
 	MOV     EDX, someStringAddress
@@ -34,7 +46,7 @@ mDisplayString	MACRO	someStringAddress
 ENDM
 
 .data
-
+;Setting up variables for MAIN
 intro			BYTE	"PROJECT 6:	The sacred design of I/O procedures and low-level programming",9,9,"by Aimee Wirick",10,10,0
 directions		BYTE	"DIRECTIONS:",10,"Input 10 positive or negative integers that can fit in a 32 bit register.",10,"When you are done, the list of your numbers, their sum, and average will be displayed.",13,10,0
 numbrPrmpt		BYTE	"Enter your signed number here:", 0 ;prompt user to enter number
@@ -47,13 +59,19 @@ usrInput		SDWORD	11 DUP(?) ; number from user
 byteCount		DWORD	? ;number of bytes in user input
 usrArray		SDWORD  11 DUP(?)
 localNum		SDWORD  ?
-arrayLen		DWORD	3 ;ten numbers long
+arrayLen		DWORD	10 ;ten numbers long
 counter			SDWORD	?
 numberSum		SDWORD  ?
 avrgNum			SDWORD	?
 corrNum			SDWORD	?
 
 .code
+; description: MAIN Procedure, Uses procedures ReadVal called withing loop in main to get and store 10 integers
+;	and WriteVal to display the integers.  Main also calculates and displays the integers and their truncated average
+; preconditions: Variables are set up, ReadVal and WriteVal are set up as well as the macros mDisplayString, and mGetString
+; postconditions: Converts string to number, stores, coverts number to string
+; receives: number inputs obtained as string values
+; returns: prints array of input, sum, average as output
 main PROC
 	_intro:
 	mDisplayString	OFFSET intro		;print intro
@@ -95,11 +113,11 @@ main PROC
 			ADD		numberSum, EAX ;adds the number to the numberSum to track total
 			MOV		counter, ECX
 			CALL	WriteVal	;4 bytes return address .... writes the numbers individually
-			CMP		ECX, 1
+			CMP		ECX, 1 ;leaves off comma and space if it is last number
 			JE		_finish
-			MOV		AL, 44
+			MOV		AL, 44 ;adds comma
 			CALL	WriteChar
-			MOV		AL, 32
+			MOV		AL, 32 ;adds space
 			CALL	WriteChar
 			_finish:
 			MOV		ECX, counter
@@ -129,6 +147,12 @@ main PROC
 	Invoke ExitProcess,0	; exit to operating system
 main ENDP
 
+; description: Invokes mGetString macro to get user input in the form of string.  Converts string using string primitives to ascii digits
+				;validates that user input is within the required parameters.  Stores the value by reference
+; preconditions: mGetString is set up, and reference perameters have been pushed from main to fill local variables, for the user input and number outputs.
+; postconditions: Converts and Stores the converted user input into the array by address
+; receives: pushed variables from main for user input, number of bytes, maximum allowable length, and destination address for converted number
+; returns: converted number to destination address
 ReadVal	PROC
 
 ;local variables to keep my head straight :)
@@ -162,11 +186,11 @@ ReadVal	PROC
 	MOV		EBX, [EBP+16]	;find max length
 	MOV		lengthMax, EBX	;fill max length variable
 	MOV		EBX, [EBP+20]	;find prompt
-	MOV		origPrompt, EBX		;fill prompt variable
+	MOV		origPrompt, EBX	;fill prompt variable
 	MOV		EBX, [EBP+24]	;find error message
 	MOV		errTryAgain, EBX;fill error message prompt
 	MOV		EBX, [EBP+28]	;find corrNum address
-	MOV		correctNum, EBX
+	MOV		correctNum, EBX ;fill the correctNumber address
 
 	MOV		EBX, origPrompt
 	MOV		prompt, EBX
@@ -174,7 +198,7 @@ ReadVal	PROC
 	mGetString	prompt, lengthMax, inputNum, byteNum ;get string
 	CLD
 	MOV sign,0
-	MOV EBX, origPrompt
+	MOV EBX, origPrompt ;this sets the original
 	MOV prompt, EBX
 	MOV	ECX, byteNum ;start counter for gathering each byte
 	MOV	ESI, inputNum ;start pointers for gathering each byte
@@ -213,12 +237,12 @@ ReadVal	PROC
 			PUSH	prevNum			;4 byte SDWORD
 			PUSH	currNum			;4 byte SDWORD
 			PUSH	sign			;4 byte DWORD
-			LEA		EBX, tempPrev   ;MAKE THIS A LOCAL VARIABLE IN Convert? Take it out here
+			LEA		EBX, tempPrev   
 			PUSH	EBX				;4 byte register
 			LEA     EBX, errorMes
 			PUSH	EBX				;4 byte register
 			CALL	Convert
-			JO	 _errorMSG
+			JO	 _errorMSG  ;this is important and catches the error if the last number flagged overflow when added
 			CMP		errorMes, 1
 			JE		_errorMSG
 			JMP  _store
@@ -226,14 +250,14 @@ ReadVal	PROC
 			MOV		EBX, errTryAgain
 			MOV		prompt, EBX ;sets error prompt
 			XOR     EBX,EBX
-			MOV     errorMes, EBX
-			MOV		countNum, EBX
-			MOV     prevNum, EBX
-			MOV		tempPrev, EBX
+			MOV     errorMes, EBX ;clears errorMes
+			MOV		countNum, EBX ;clears countNum
+			MOV     prevNum, EBX ;clears prevNum
+			MOV		tempPrev, EBX ;clears tempPrev
 			JMP _start
 
 		_store:
-			MOV		EAX, tempPrev
+			MOV		EAX, tempPrev ;finds the temporary number
 			MOV		prevNum, EAX ;stores the number as prevNum so we can progress
 			INC		countNum
 		_end:
@@ -246,6 +270,12 @@ ReadVal	PROC
 	RET		24
 ReadVal	ENDP
 
+; description: A sub procedure of ReadVal with conversion process to convert string numbers to ascii.  Returns an error message if the converted number gets to big for register
+; preconditions: The previous number in the sequence, the current number, the sign, the address to return converted number to, and the address for error message
+					;are pushed to Convert via ReadVal
+; postconditions: returns converted number to address sent by ReadVal, returns error if there is one.
+; receives: numbers and addresses from ReadVal
+; returns: converted number or error message
 Convert PROC ;subprocedure of ReadVal
 	LOCAL	MAX:SDWORD
 	LOCAL	MIN:SDWORD
@@ -276,53 +306,57 @@ Convert PROC ;subprocedure of ReadVal
 	MOV		MAX, +214748364
 	MOV		EDI, errorMes
 	MOV		EBX,0
-	MOV		[EDI],EBX
+	MOV		[EDI],EBX ;clears error message in ReadVal ...was having trouble keeping this cleared after starting a new number post error
 	XOR		EAX,EAX
 	MOV		tempNum, 0
 	_convert:
 			MOV		EAX, current
-			SUB		EAX, 48
+			SUB		EAX, 48 ;changes to ascii number
 			MOV		EBX, sign2
-			CMP		EBX, 1 ;EBX should have sign value
+			CMP		EBX, 1 ;EBX checks if the sign is negative
 			JE		_fixSign
 			JMP		_continue
 			_fixSign:
 			MOV		tempNum, EAX
 			MOV		EAX, negSign
-			IMUL	EAX, tempNum;this is changing the register to a crazy number
-			_continue:
+			IMUL	EAX, tempNum ;multiplies our temporary number by -1
+			_continue: ;continues conversion process
 			MOV		subNum, EAX
 			MOV		EAX, 0
-			MOV		EAX, previousNum
-			CMP		EAX, MIN
+			MOV		EAX, previousNum 
+			CMP		EAX, MIN ;compares previous number to MIN to make sure it isn't too small so far
 			JL		_error
-			CMP		EAX, MAX
+			CMP		EAX, MAX ;compares previous number to MAX to make sure it isn't too big so far
 			JG		_error
 			MOV		EBX, 10
-			IMUL	EBX
-			ADD		EAX, subNum
+			IMUL	EBX     ;changes the place of previous number by 10
+			ADD		EAX, subNum ;adds the new integer
 			JMP		_store
 			_error:
 			MOV	EDI, errorMes
-			MOV EBX, 1
-			MOV [EDI], EBX
-			XOR EBX,EBX
-
-			JMP _end
+			MOV EBX, 1 
+			MOV [EDI], EBX ;alerts parent procedure that there has been an error
+			XOR EBX,EBX ;clears the EBX register
+			JMP _end ;doesn't store this number
 			_store:
-			MOV EDI, outNumAddr
-			MOV [EDI], EAX
+			MOV EDI, outNumAddr ;finds address to send to ReadVal
+			MOV [EDI], EAX ;sends converted number back to ReadVal
 			_end:
 	POPAD
 	RET 20
 Convert ENDP
 
-WriteVal	PROC ;this works
+; description: A procedure that takes an ascii number and converts its digits to a string and returns it
+; preconditions: An ascii number is passed via the stack from main
+; postconditions: A string is returned via reference 
+; receives: An ascii number passed on the stack
+; returns: A string made of converted ascii digits
+WriteVal	PROC 
 
-		LOCAL	numDigits:DWORD	;USE Str_length TO GET THIS INSTEAD BECAUSE THIS WILL HAVE CHANGED
+		LOCAL	numDigits:DWORD	;number of digits in the number
 		LOCAL	number:SDWORD	
 		LOCAL	copyNumber:SDWORD
-		LOCAL	arrayAddress:DWORD	 ;does this have to be an array set-up since it is just an address?
+		LOCAL	arrayAddress:DWORD	 ;address for array
 		LOCAL	revString[12]:BYTE	
 		LOCAL	newNum:DWORD	
 		LOCAL	remainder:DWORD
@@ -332,7 +366,7 @@ WriteVal	PROC ;this works
 		LOCAL	byteQuotient:DWORD
 
 		PUSHAD
-
+		;clear local variables for the new number
 		MOV		numDigits, 0
 		MOV		number, 0
 		MOV		copyNumber, 0
@@ -343,36 +377,36 @@ WriteVal	PROC ;this works
 		MOV		quotient, 0
 		MOV		isNeg, 0
 		XOR		EAX,EAX
-		MOV		ECX, 12
+		MOV		ECX, 12 ;gives our counter 10 rounds with buffer for negative sign
 		LEA		EBX, newString
 		MOV		EDI, EBX
 		CLD
-		REP     STOSB
+		REP     STOSB ;clears newString variable for starting fresh
 		MOV		byteQuotient, 0
 	
-
+		;get informatinon to fill variables from the stack
 		MOV		EBX,0
 		MOV		EBX,[EBP+8]	;find user input number
 		MOV		number, EBX		;fill user input variable
 
 
-
+		;fill local variables
 		MOV		revString, 0
 		;Set up the perameters for _writeLoop		
 		_checkSign:
 		MOV	EAX, 0 ;clear eax for new byte
 		MOV	EAX, number
-		SUB	EAX, 0
+		SUB	EAX, 0 ;checks if our number is negative
 		JS _negative
 		JMP _next
         _negative:
 		MOV		isNeg, 1
-		IMUL	EAX, -1
+		IMUL	EAX, -1 ;changes it to positive so that we can evaluate easier
 		MOV		number, EAX	
 		_next:
-		MOV		newNum, EAX
-		MOV		byteQuotient, EAX
-		_findNumberOfDigits:
+		MOV		newNum, EAX ;moves our now positive valued number into newNum
+		MOV		byteQuotient, EAX ;moves to the quotient variable for calculating number of digits
+		_findNumberOfDigits: ;decreases by a place value each iteration so we can count digits (excluding negative sign)
 			MOV	EAX, byteQuotient
 			MOV	EDX, 0
 			MOV	EBX, 10
@@ -390,8 +424,8 @@ WriteVal	PROC ;this works
 		MOV		ECX, 0
 		MOV		ECX, numDigits
 		CMP		ECX, 1
-		JE		_writeSingleLoop
-		_writeMultipleLoop:
+		JE		_writeSingleLoop ;converts number without changing place value loop
+		_writeMultipleLoop: ;for when there are more than one number and place values need to be considered
 			MOV EAX, newNum
 			MOV EDX, 0
 			MOV EBX, 10
@@ -399,19 +433,19 @@ WriteVal	PROC ;this works
 			MOV	remainder, EDX
 			MOV quotient, EAX
 			MOV EDX, remainder
-			ADD	EDX, 48
+			ADD	EDX, 48 ;converts
 			MOV	[EDI], EDX
-			ADD	EDI, 1 ;may need to change back to 4?
-			MOV newNum, EAX
+			ADD	EDI, 1 ;adds number to next address in string
+			MOV newNum, EAX ;saves the result as newNum
 			LOOP _writeMultipleLoop
 			JMP _postLoop
-		_writeSingleLoop:
+		_writeSingleLoop: ;for if there is only one number
 			MOV EAX, newNum
 			ADD EAX, 48
 			MOV [EDI], EAX
 			ADD EDI, 1
 			MOV EAX, 0
-		_postLoop:			
+		_postLoop:	;finishes our string		
 			MOV	AL, isNeg ;adds negative at end of string so that when we reverse it it will be read at beginning
 			CMP	AL, 1
 			JE	_addNeg
@@ -422,26 +456,25 @@ WriteVal	PROC ;this works
 			MOV	isNeg, 0
 			INC	numDigits
 			_end:
-			;ADD ANOTHER WRITE USING STOSB AND REVERSING STRING TO CREATE FORWARDS STRING FOR WRITING?
 		  ; Reverse the string
 	_loopReversal:
 	  MOV	 ECX, 0
-	  MOV    ECX, numDigits
-	  LEA    ESI, revString 
-	  ADD    ESI, ECX
-	  DEC    ESI
-	  LEA    EDI, newString;SHOULD THIS BE STORED IN arrayAddress? MAYBE MAYBE NOT
+	  MOV    ECX, numDigits ;how long string is
+	  LEA    ESI, revString ;finds the source string
+	  ADD    ESI, ECX ;finds address of end of string
+	  DEC    ESI ;starts at the end of revString
+	  LEA    EDI, newString;address destination of our correctly ordered string
 	  MOV	EAX, 0	
 	  MOV newString, 0
 	  ;   Reverse string
-	_revLoop: ;this isn't working
+	_revLoop: ;reverses string
 		STD
 		LODSB
 		CLD
 		STOSB
 	  LOOP   _revLoop
-	LEA	EAX, newString;SHOULD THIS BE STORED IN arrayAddress? MAYBE MAYBE NOT
-	mDisplayString	EAX
+	LEA	EAX, newString;finds address of newString
+	mDisplayString	EAX ;stores item in string
 
 	POPAD
 
