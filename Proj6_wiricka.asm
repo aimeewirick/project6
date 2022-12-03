@@ -23,6 +23,7 @@ INCLUDE Irvine32.inc
 ; returns: the user's input(by reference), number of byes
 mGetString	MACRO	prompt, availLength, someInput, bytes
 	PUSHAD
+	XOR		EDX,EDX
 	MOV		EDX, prompt ;prompt user to enter a number
 	CALL	WriteString
 	MOV		EDX, someInput ;moves address for someInput; placholder for variable to EDX which will then have user number in it CHANGE OFFSET?
@@ -39,6 +40,7 @@ ENDM
 ; returns: Prints string
 mDisplayString	MACRO	someStringAddress
 	PUSHAD
+	XOR		EDX,EDX
 	MOV     EDX, someStringAddress
 	CALL	WriteString
 
@@ -54,6 +56,9 @@ errorPrmpt		BYTE	"ERROR:  You didn't enter a number, or your number was an incor
 yourNumbers		BYTE	"The numbers you entered are: ", 13,10,0
 yourAverage		BYTE	"The average of your numbers is: ",13,10,0
 yourSum			BYTE	"The Sum of your numbers is: ", 13,10,0
+goodbye			BYTE	"Goodbye, Happy End of Term, and Happy Holidays!!", 13,0
+
+
 maxLen			DWORD	12 ;maximum length of usrInput
 usrInput		SDWORD	11 DUP(?) ; number from user
 byteCount		DWORD	? ;number of bytes in user input
@@ -144,6 +149,10 @@ main PROC
 		CALL	WriteVal ;4 bytes return address .... writes the average
 		CALL	CrLf
 		CALL	CrLf
+		_goodbye:
+		mDisplayString OFFSET goodbye
+		CALL CrLf
+
 	Invoke ExitProcess,0	; exit to operating system
 main ENDP
 
