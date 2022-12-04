@@ -48,17 +48,30 @@ mDisplayString	MACRO	someStringAddress
 ENDM
 
 .data
-;Setting up variables for MAIN
-intro			BYTE	"PROJECT 6:	The sacred design of I/O procedures and low-level programming",9,9,"by Aimee Wirick",10,10,0
+;string variables
+intro			BYTE	"PROJECT 6:	The sacred design of I/O procedures and low-level programming",9,9,"by Aimee Wirick",13,10,10,0
 directions		BYTE	"DIRECTIONS:",10,"Input 10 positive or negative integers that can fit in a 32 bit register.",10,"When you are done, the list of your numbers, their sum, and average will be displayed.",13,10,0
 numbrPrmpt		BYTE	"Enter your signed number here:", 0 ;prompt user to enter number
 errorPrmpt		BYTE	"ERROR:  You didn't enter a number, or your number was an incorrect format.",10,"Give it another try:", 0
-yourNumbers		BYTE	"The numbers you entered are: ", 13,10,0
-yourAverage		BYTE	"The average of your numbers is: ",13,10,0
-yourSum			BYTE	"The Sum of your numbers is: ", 13,10,0
-goodbye			BYTE	"Goodbye, Happy End of Term, and Happy Holidays!!", 13,0
-
-
+yourNumbers		BYTE	"The numbers you entered are: ",0
+yourAverage		BYTE	"The truncated average of your numbers is: ",0
+yourSum			BYTE	"The Sum of your numbers is: ",0
+totalText		BYTE	"The running total is: ",0
+goodbye			BYTE	"Goodbye, Happy End of Term, and Happy Holidays!!", 13,10,10,0
+ecOne			BYTE	"**EC: Number each line. Add running subtotal. Use WriteVal.",13,10,10,0
+;playing with ascii
+hhLine1			BYTE	32,32,124,32,32,124,32,32,32,61,61,32,32,32,61,61,61,32,32,32,61,61,61,32,32,32,61,32,32,61,13,10,0
+hhLine2			BYTE	32,32,124,32,32,124,32,32,124,32,32,124,32,32,124,32,32,124,32,32,124,32,32,124,32,32,124,32,32,124,13,10,0
+hhLine3			BYTE	32,32,61,61,61,61,32,32,61,61,61,61,32,32,124,32,32,124,32,32,124,32,32,124,32,32,124,32,32,124,13,10,0
+hhLine4			BYTE	32,32,124,32,32,124,32,32,124,32,32,124,32,32,61,61,61,32,32,32,61,61,61,32,32,32,32,61,61,32,13,10,0
+hhLine5			BYTE	32,32,124,32,32,124,32,32,124,32,32,124,32,32,124,32,32,32,32,32,124,32,32,32,32,32,32,32,124,32,13,10,0
+hhLine6			BYTE	32,32,124,32,32,124,32,32,124,32,32,124,32,32,124,32,32,32,32,32,124,32,32,32,32,32,32,32,124,32,13,10,10,0
+hhLine7			BYTE	32,32,124,32,32,124,32,32,61,61,32,32,124,32,32,32,61,61,61,32,61,61,32,32,61,61,61,32,124,32,124,32,61,61,61,13,10,0
+hhLine8			BYTE	32,32,124,32,32,124,32,124,32,32,124,32,124,32,32,32,32,124,32,32,124,32,124,32,124,32,124,32,124,32,124,32,124,13,10,0
+hhLine9			BYTE	32,32,124,61,61,124,32,124,32,32,124,32,124,32,32,32,32,124,32,32,124,32,124,32,61,61,61,32,61,61,61,32,61,61,61,13,10,0
+hhLine10		BYTE	32,32,124,32,32,124,32,124,32,32,124,32,124,32,32,32,32,124,32,32,124,32,124,32,124,32,124,32,32,124,32,32,32,32,124,13,10,0
+hhLine11		BYTE	32,32,124,32,32,124,32,32,61,61,32,32,61,61,61,32,61,61,61,32,61,61,32,32,124,32,124,32,32,124,32,32,61,61,61,13,10,10,0
+;setting up variables with data
 maxLen			DWORD	12 ;maximum length of usrInput
 usrInput		SDWORD	11 DUP(?) ; number from user
 byteCount		DWORD	? ;number of bytes in user input
@@ -69,7 +82,8 @@ counter			SDWORD	?
 numberSum		SDWORD  ?
 avrgNum			SDWORD	?
 corrNum			SDWORD	?
-
+lineNum			SDWORD	1
+runTotal		SDWORD	?
 .code
 ; description: MAIN Procedure, Uses procedures ReadVal called withing loop in main to get and store 10 integers
 ;	and WriteVal to display the integers.  Main also calculates and displays the integers and their truncated average
@@ -80,6 +94,7 @@ corrNum			SDWORD	?
 main PROC
 	_intro:
 	mDisplayString	OFFSET intro		;print intro
+	mDisplayString  OFFSET ecOne		;print extra credit text
 	mDisplayString	OFFSET directions	;print directions
 	CALL	CrLf
 
@@ -88,6 +103,10 @@ main PROC
 	MOV		ECX, arrayLen				
 	MOV		EDI, OFFSET usrArray
 	_fillArray:
+		PUSH	lineNum				;4 bytes SDWORD
+		CALL	WriteVal			;4 bytes return address, write line number
+		MOV		AL, 32
+		CALL	WriteChar
 		PUSH	OFFSET	corrNum		;4 bytes address
 		PUSH	OFFSET	errorPrmpt	;4 bytes address
 		PUSH	OFFSET	numbrPrmpt	;4 bytes address
@@ -95,6 +114,15 @@ main PROC
 		PUSH	OFFSET  usrInput	;4 bytes address
 		PUSH	OFFSET	byteCount	;4 bytes address
 		CALL	ReadVal				;4 bytes return address
+		mDisplayString OFFSET totalText ;dialogue for running total
+		INC		lineNum
+		MOV		EAX, runTotal  ;calculate running total
+		ADD		EAX, corrNum
+		MOV		runTotal, EAX
+		PUSH	runTotal
+		CALL	WriteVal		;display total
+		CALL	CrLf	
+		CALL	CrLf
 		MOV		EBX, corrNum
 		MOV		[EDI], EBX			;store number in array
 		ADD		EDI, 4
@@ -152,7 +180,18 @@ main PROC
 		_goodbye:
 		mDisplayString OFFSET goodbye
 		CALL CrLf
-
+		;just for fun for the holidays a little playing with ascii
+		mDisplayString OFFSET hhLine1
+		mDisplayString OFFSET hhLine2
+		mDisplayString OFFSET hhLine3
+		mDisplayString OFFSET hhLine4
+		mDisplayString OFFSET hhLine5
+		mDisplayString OFFSET hhLine6
+		mDisplayString OFFSET hhLine7
+		mDisplayString OFFSET hhLine8
+		mDisplayString OFFSET hhLine9
+		mDisplayString OFFSET hhLine10
+		mDisplayString OFFSET hhLine11
 	Invoke ExitProcess,0	; exit to operating system
 main ENDP
 
@@ -179,13 +218,14 @@ ReadVal	PROC
 	LOCAL	correctNum:SDWORD
 	LOCAL   tempPrev:SDWORD
 	PUSHAD ;push all directories 32 bytes
-	
+
 	;clear variables
 	MOV		errorMes, 0
 	MOV		countNum, 0
 	MOV		prevNum, 0
 	MOV		sign, 0
 	MOV		correctNum, 0
+
 	;set up variable data
 	MOV		EBX, 0
 	MOV		EBX, [EBP+8]	;find bytes
@@ -203,6 +243,7 @@ ReadVal	PROC
 
 	MOV		EBX, origPrompt
 	MOV		prompt, EBX
+
 	_start:
 	mGetString	prompt, lengthMax, inputNum, byteNum ;get string
 	CLD
@@ -214,7 +255,6 @@ ReadVal	PROC
 	CMP byteNum, 0
 	JE	_errorMSG
 	_conversionLoop:
-
 	 XOR	EAX,EAX;clears EAX register for introducing our first byte
 	 LODSB  ;puts byte in AL
 		CMP		AL, 43 ; +
@@ -270,6 +310,7 @@ ReadVal	PROC
 			MOV		prevNum, EAX ;stores the number as prevNum so we can progress
 			INC		countNum
 		_end:
+	
 	LOOP _conversionLoop
 
 	MOV  EDI, correctNum ;address for corrNum
